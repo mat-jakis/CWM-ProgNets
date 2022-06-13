@@ -15,7 +15,7 @@ def send_random_traffic(num_packets, interface, src_ip, dst_ip):
     total_pkts = 0
     port = 1024
     for i in range(num_packets):
-            data = randomword(22)
+            data = randomword(10)
             p = Ether(dst=dst_mac,src=src_mac)/IP(dst=dst_ip,src=src_ip)
             p = p/TCP(sport= 5555, dport=port)/Raw(load=data)
             sendp(p, iface = interface, inter = 0.01)
