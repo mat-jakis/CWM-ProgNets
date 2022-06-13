@@ -13,11 +13,11 @@ def send_random_traffic(num_packets, interface, src_ip, dst_ip):
     dst_mac = "00:00:00:00:00:01"
     src_mac= "00:00:00:00:00:02"
     total_pkts = 0
-    port = 1024
+    port = 5555
     for i in range(num_packets):
             data = randomword(22)
             p = Ether(dst=dst_mac,src=src_mac)/IP(dst=dst_ip,src=src_ip)
-            p = p/UDP(sport= 50000, dport=port)/Raw(load=data)
+            p = p/TCP(sport= 50000, dport=port)/Raw(load=data)
             sendp(p, iface = interface, inter = 0.01)
             total_pkts += 1
     print ("Sent %s packets in total" % total_pkts)
