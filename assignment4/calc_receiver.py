@@ -66,7 +66,7 @@ def main():
     
     p = make_seq(num_parser, make_seq(op_parser,num_parser))
     s = ''
-    iface = 'wlan0'
+    iface = 'eth0'
 
     while True:
         time.sleep(0.5)

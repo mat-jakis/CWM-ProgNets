@@ -67,12 +67,14 @@ const bit<8>  P4CALC_AND   = 0x26;   // '&'
 const bit<8>  P4CALC_OR    = 0x7c;   // '|'
 const bit<8>  P4CALC_CARET = 0x5e;   // '^'
 
-header p4calc_t {
-    bit<8>  op;
-/* TODO
- * fill p4calc_t header with P, four, ver, op, operand_a, operand_b, and res
-   entries based on above protocol header definition.
- */
+header p4calc_t { 
+    bit<8> p; //Letter P
+    bit<8> four; //Number 4
+    bit<8> ver; //Version
+    bit<8>  op; //Operation
+    bit<32> opA; //Operand A
+    bit<32> opB; //Operand B
+    bit<32> res; //Result
 }
 
 /*
@@ -112,15 +114,14 @@ parser MyParser(packet_in packet,
     }
 
     state check_p4calc {
-        /* TODO: just uncomment the following parse block */
-        /*
+        
         transition select(packet.lookahead<p4calc_t>().p,
         packet.lookahead<p4calc_t>().four,
         packet.lookahead<p4calc_t>().ver) {
             (P4CALC_P, P4CALC_4, P4CALC_VER) : parse_p4calc;
             default                          : accept;
         }
-        */
+        
     }
 
     state parse_p4calc {
@@ -145,34 +146,49 @@ control MyIngress(inout headers hdr,
                   inout standard_metadata_t standard_metadata) {
     action send_back(bit<32> result) {
         /* TODO
-         * - put the result back in hdr.p4calc.res
-         * - swap MAC addresses in hdr.ethernet.dstAddr and
-         *   hdr.ethernet.srcAddr using a temp variable
-         * - Send the packet back to the port it came from
-             by saving standard_metadata.ingress_port into
-             standard_metadata.egress_spec
+         Check if all works
          */
+         bit<48> tmpAddr; //Temporary address for swapping
+         tmpAddr = hdr.ethernet.dstAddr;
+         hdr.ethernet.dstAddr = hdr.ethernet.srcAddr;
+         hdr.ethernet.srcAddr = tmpAddr;
+         
+         hdr.p4calc.res = result; //Save result
+         
+         standard_metadata.egress_spec = standard_metadata.ingress_port; //Send packet
+         
     }
-
+	//TODO: check all operations below
     action operation_add() {
-        /* TODO call send_back with operand_a + operand_b */
+        bit<32> op_result;
+        op_result = hdr.p4calc.opA + hdr.p4calc.opB;
+        send_back(op_result);
     }
 
     action operation_sub() {
-        /* TODO call send_back with operand_a - operand_b */
+        bit<32> op_result;
+        op_result = hdr.p4calc.opA - hdr.p4calc.opB;
+        send_back(op_result);
     }
 
     action operation_and() {
-        /* TODO call send_back with operand_a & operand_b */
+        bit<32> op_result;
+        op_result = hdr.p4calc.opA & hdr.p4calc.opB;
+        send_back(op_result);
     }
 
     action operation_or() {
-        /* TODO call send_back with operand_a | operand_b */
+        bit<32> op_result;
+        op_result = hdr.p4calc.opA | hdr.p4calc.opB;
+        send_back(op_result);
     }
 
     action operation_xor() {
-        /* TODO call send_back with operand_a ^ operand_b */
+        bit<32> op_result;
+        op_result = hdr.p4calc.opA ^ hdr.p4calc.opB;
+        send_back(op_result);
     }
+	//TODO: check all operations above
 
     action operation_drop() {
         mark_to_drop(standard_metadata);
