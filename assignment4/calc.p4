@@ -158,7 +158,6 @@ control MyIngress(inout headers hdr,
          standard_metadata.egress_spec = standard_metadata.ingress_port; //Send packet
          
     }
-	//TODO: check all operations below
     action operation_add() {
         bit<32> op_result;
         op_result = hdr.p4calc.opA + hdr.p4calc.opB;
@@ -188,7 +187,6 @@ control MyIngress(inout headers hdr,
         op_result = hdr.p4calc.opA ^ hdr.p4calc.opB;
         send_back(op_result);
     }
-	//TODO: check all operations above
 
     action operation_drop() {
         mark_to_drop(standard_metadata);

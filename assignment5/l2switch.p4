@@ -3,6 +3,7 @@
 #include <v1model.p4>
 
 const bit<16> TYPE_IPV4 = 0x800;
+const bit<32> DEV_MACADDR = 00:00:00:00; //TODO check if correct
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
@@ -50,10 +51,18 @@ parser MyParser(packet_in packet,
                 out headers hdr,
                 inout metadata meta,
                 inout standard_metadata_t standard_metadata) {
-
+	//TODO: check if works
     state start {
-        /* TODO: add parser logic */
-        transition accept;
+        packet.extract(hdr.ethernet);
+        transition select(hdr.ethernet.etherType) {
+            TYPE_IPV4 	  : parse_ipv4; //check if type is IPv4
+            default      : accept;
+        }
+    }
+    
+    state parse_ipv4{ //extract header
+    	packet.extract(hdr.ipv4);
+    	transition accept;
     }
 }
 
@@ -79,7 +88,16 @@ control MyIngress(inout headers hdr,
     }
 
     action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
-        /* TODO: fill out code in action body */
+        // TODO check if works
+        //Change addresses
+        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr; //Update source address
+        hdr.ethernet.dstAddr = dstAddr; //Update destination address
+        
+        //Decrement ttl
+        hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
+        
+        //Forward using appropriate port
+        standard_metadata.egress_spec = port; //Send packet
     }
 
     table ipv4_lpm {
@@ -96,10 +114,12 @@ control MyIngress(inout headers hdr,
     }
 
     apply {
-        /* TODO: fix ingress control logic
-         *  - ipv4_lpm should be applied only when IPv4 header is valid
-         */
-        ipv4_lpm.apply();
+        if (hdr.ipv4.isValid()) {
+            ipv4_lpm.apply();
+        } else {
+            drop();
+        }
+        
     }
 }
 
@@ -144,7 +164,8 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
 
 control MyDeparser(packet_out packet, in headers hdr) {
     apply {
-        /* TODO: add deparser logic */
+        packet.emit(hdr.ethernet);
+        packet.emit(hdr.ipv4);
     }
 }
 
