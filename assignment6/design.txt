@@ -1,0 +1,16 @@
+Types of traffic (Ethertype):
+
+1. ARP (0x0806)
+
+2. IPv4 (0x0800)
+2.1 ICMP
+2.2 TCP
+2.3 UDP
+
+3. IPv6 (0x86dd)
+
+
+
+
+
+Program will first check whether an incoming packet is a correct type. If so it will extract the headers, otherwise it will reject it.
