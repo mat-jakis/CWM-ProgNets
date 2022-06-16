@@ -21,7 +21,7 @@ class P4calc(Packet):
                     StrFixedLenField("op", "+", length=1),
                     IntField("operand_a", 0),
                     IntField("operand_b", 0),
-                    IntField("result", 0xDEADBABE)]
+                    IntField("result", 0xCAFECAFE)]
 
 bind_layers(Ether, P4calc, type=0x1234)
 
