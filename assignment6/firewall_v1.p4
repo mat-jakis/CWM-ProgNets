@@ -15,10 +15,10 @@ const bit<8> PROT_TCP = 6;
 const bit<8> PROT_UDP = 17;
 
 //Temporal limiting variables
-const bit<48> deltaTime = 10000; 		//Length of the timeframe (us), default 1000 (10ms)
+const bit<48> deltaTime = 10000; 			//Length of the timeframe (us), default 1000 (10ms)
 const bit<48> packetLimit = 10;			//limit of packets in one timeframe, default 10
-register<bit<48>>(1) regPacketCount; 	//number of packets in current timeframe
-register<bit<48>>(1) regPrevTime; 		//time at the start of the current timeframe (us)
+register<bit<48>>(1) regPacketCount; 			//number of packets in current timeframe
+register<bit<48>>(1) regPrevTime; 			//time at the start of the current timeframe (us)
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************

@@ -15,10 +15,10 @@ const bit<8> PROT_TCP = 6;
 const bit<8> PROT_UDP = 17;
 
 //Temporal limiting variables
-const bit<48> deltaTime = 10000; 		//Length of the timeframe (us), default 1000 (10ms)
-const bit<48> packetLimit = 10;			//limit of packets in one timeframe, default 10
-register<bit<48>>(1) regPacketCount; 	//number of packets in current timeframe
-register<bit<48>>(1) regPrevTime; 		//time at the start of the current timeframe (us)
+const bit<48> deltaTime = 10000; 			//Length of the timeframe (about 2/3 us), default 10000 (about 6.7ms)
+const bit<48> packetLimit = 10;				//limit of packets in one timeframe, default 10
+register<bit<48>>(1) regPacketCount; 		//number of packets in current timeframe
+register<bit<48>>(1) regPrevTime; 			//time at the start of the current timeframe (about 2/3 us)
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
@@ -86,9 +86,9 @@ parser MyParser(packet_in packet,
     state start {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
-            TYPE_IPV4 	 : parse_ipv4; //check if type is IPv4
-            TYPE_IPV6 	 : parse_ipv6; //check if type is IPv6
-            default      : reject_packet; //reject packets by default
+            TYPE_IPV4 	 : parse_ipv4; 		//check if type is IPv4
+            TYPE_IPV6 	 : parse_ipv6; 		//check if type is IPv6
+            default      : reject_packet; 	//reject packets by default
         }
     }
     state reject_packet{ //reject packet
@@ -126,17 +126,22 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
-    bit<1> validFlag; //Flag showing if current packet is allowed to pass
-    bit<1> blackListFlag; //Flag raised when source is on a blacklist
+    bit<1> validFlag; 		//Flag showing if current packet is allowed to pass
+    bit<1> blackListFlag; 	//Flag raised when source is on a blacklist
+    bit<1> forwardFlag; 	//Flag raised when a forwarding address is found
     
     action packet_drop() {
         mark_to_drop(standard_metadata);
     }
 
     action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
+        //Raise the flag
+        forwardFlag = 1;
+        log_msg("Forwarding to {}", {dstAddr}); //Debug msg
+        
         //Change addresses
-        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr; //Update source address
-        hdr.ethernet.dstAddr = dstAddr; //Update destination address
+        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr; 	//Update source address
+        hdr.ethernet.dstAddr = dstAddr; 				//Update destination address
         
         //Decrement ttl
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
@@ -146,15 +151,19 @@ control MyIngress(inout headers hdr,
     }
     
     action ipv6_forward(macAddr_t dstAddr, egressSpec_t port) {
+        //Raise the flag
+        forwardFlag = 1;
+        log_msg("Forwarding to {}", {dstAddr}); //Debug msg
+        
         //Change addresses
-        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr; //Update source address
-        hdr.ethernet.dstAddr = dstAddr; //Update destination address
+        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr; 	//Update source address
+        hdr.ethernet.dstAddr = dstAddr; 				//Update destination address
         
         //Decrement ttl
         hdr.ipv6.ttl = hdr.ipv6.ttl - 1;
         
         //Forward using appropriate port
-        standard_metadata.egress_spec = port; //Send packet
+        standard_metadata.egress_spec = port; //Send packet        
     }
     
     table ipv4_lpm { //Table with v4 lpm address matching
@@ -238,9 +247,9 @@ control MyIngress(inout headers hdr,
         
         const default_action = NoAction;
         const entries = { //ipv4_valid() for whitelisted protocols
-        PROT_ICMP:		ipv4_valid();
-        PROT_TCP:		ipv4_valid();
-        PROT_UDP:		NoAction();
+        PROT_ICMP:		ipv4_valid(); 	//default valid
+        PROT_TCP:		ipv4_valid(); 	//default valid
+        PROT_UDP:		NoAction(); 	//default NoAction
         	
         }
     }
@@ -256,9 +265,9 @@ control MyIngress(inout headers hdr,
         
         const default_action = NoAction;
         const entries = { //ipv6_valid() for whitelisted protocols
-        PROT_ICMPv6:	ipv6_valid();
-        PROT_TCP:		NoAction();
-        PROT_UDP:		NoAction();
+        PROT_ICMPv6:		ipv6_valid(); 	//default valid
+        PROT_TCP:		NoAction(); 		//default NoAction
+        PROT_UDP:		NoAction();			//default NoAction
         	
         }
     }
@@ -270,35 +279,14 @@ control MyIngress(inout headers hdr,
     			packet_drop(); //Drop packets if any error detected
     			exit;
 		}
-    
-    	//Check if not over packet limit
-    	bit<48> prevTime;
-    	bit<48> curTime = standard_metadata.ingress_global_timestamp;
-    	bit<48> packetCount;
-    	regPrevTime.read(prevTime, 0);
 		
-    	if(curTime - prevTime > deltaTime || curTime < prevTime){
-    		regPrevTime.write(0, curTime);
-    		regPacketCount.write(0, 0);
-    		//Reset the registers if timeframe is over or time overflow
-    	}
-    	else{
-    		regPacketCount.read(packetCount, 0);
-    		if(packetCount > packetLimit){
-    			log_msg("Packet limit reached"); //Debug msg
-    			packet_drop();
-				exit;
-    		}
-    		else{
-    			packetCount = packetCount + 1;
-    			regPacketCount.write(0, packetCount);
-    		}
-    	}
+		blackListFlag = 0; //Ensure flags are set to 0
+        validFlag = 0; 
+        forwardFlag = 0;
+		
 
 		//Do appropriate type processing
         if (hdr.ipv4.isValid()) { //Do ipv4 processing if valid  
-        		blackListFlag = 0;
-        		validFlag = 0; //Ensure flags are set to 0
         		
         		ipv4_blacklist.apply(); //Check if address not blacklisted
         		if(blackListFlag == 1){
@@ -312,12 +300,11 @@ control MyIngress(inout headers hdr,
             	}
             	else {
             		packet_drop(); //Drop otherwise
+            		exit;
             	}
         } 
         else if (hdr.ipv6.isValid()) { //Do ipv6 processing if valid  
-        		blackListFlag = 0;
-        		validFlag = 0; //Ensure flags are set to 0
-        		
+        
         		ipv6_blacklist.apply(); //Check if address not blacklisted
         		if(blackListFlag == 1){
         			packet_drop();
@@ -330,11 +317,38 @@ control MyIngress(inout headers hdr,
             	}
             	else {
             		packet_drop(); //Drop otherwise
+            		exit;
             	}
         } 
         else {
         	packet_drop();
+        	exit;
         }
+        
+        if(forwardFlag == 1){ //Check if not over packet limit if going to forward
+	
+    		bit<48> prevTime;
+    		bit<48> curTime = standard_metadata.ingress_global_timestamp;
+    		bit<48> packetCount;
+    		regPrevTime.read(prevTime, 0);
+		
+    		if(curTime - prevTime > deltaTime || curTime < prevTime){
+    			regPrevTime.write(0, curTime);
+    			regPacketCount.write(0, 0);
+    			//Reset the registers if timeframe is over or time overflow
+    		}
+    		else{
+    			regPacketCount.read(packetCount, 0);
+    			if(packetCount >= packetLimit){
+    				log_msg("Packet limit reached"); //Debug msg
+    				packet_drop();
+    			}
+    			else{
+    				packetCount = packetCount + 1;
+    				regPacketCount.write(0, packetCount);
+    			}
+    		}
+    	}
     }
 }
 
